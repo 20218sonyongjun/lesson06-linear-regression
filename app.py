@@ -67,36 +67,75 @@ with col3:
 
 st.markdown("---")
 
-# 회귀 분석 모델 학습
-X = df_annual[["연도"]]
-y = df_annual["연평균기온"]
+# 1. 전체 기간 회귀 분석 모델 학습
+X_all = df_annual[["연도"]]
+y_all = df_annual["연평균기온"]
+model_all = LinearRegression()
+model_all.fit(X_all, y_all)
 
-model = LinearRegression()
-model.fit(X, y)
+slope_all = model_all.coef_[0]  # 1년당 기온 변화
+slope_all_100y = slope_all * 100  # 100년당 기온 변화
+
+# 2. 최근 20년 기간 회귀 분석 모델 학습 (예: 2006년 ~ 2025년)
+recent_year_threshold = end_year - 20
+df_recent = df_annual[df_annual["연도"] >= recent_year_threshold]
+X_recent = df_recent[["연도"]]
+y_recent = df_recent["연평균기온"]
+model_recent = LinearRegression()
+model_recent.fit(X_recent, y_recent)
+
+slope_recent = model_recent.coef_[0]  # 1년당 기온 변화
+slope_recent_100y = slope_recent * 100  # 100년당 기온 변화
+
+# --- 기울기 비교 화면 표시 ---
+st.subheader("📈 기온 상승 속도 비교 (100년 기준)")
+col_a, col_b = st.columns(2)
+
+with col_a:
+  st.markdown(
+      f"<div style='padding: 20px; border-radius: 10px; background-color:"
+      " #f0f2f6; text-align: center;'><h3>전체 기간 ({start_year}~{end_year}년)</h3>"
+      f"<p style='font-size: 36px; font-weight: bold; color:"
+      f" #1f77b4;'>+{slope_all_100y:.2f} °C / 100년</p><p>(연간"
+      f" +{slope_all:.4f}°C)</p></div>",
+      unsafe_allow_html=True,
+  )
+
+with col_b:
+  st.markdown(
+      f"<div style='padding: 20px; border-radius: 10px; background-color:"
+      " #f0f2f6; text-align: center;'><h3>최근 20년"
+      f" ({recent_year_threshold}~{end_year}년)</h3><p style='font-size: 36px;"
+      f" font-weight: bold; color: #ff7f0e;'>+{slope_recent_100y:.2f} °C /"
+      f" 100년</p><p>(연간 +{slope_recent:.4f}°C)</p></div>",
+      unsafe_allow_html=True,
+  )
+
+st.markdown("")
 
 # 상관계수 계산
 correlation = df_annual["연도"].corr(df_annual["연평균기온"])
 
-# 회귀 직선용 예측 값 생성
-df_annual["예측기온"] = model.predict(X)
+# 전체 기간 회귀 직선용 예측 값 생성
+df_annual["예측기온"] = model_all.predict(X_all)
 
 # 시각화 (Plotly)
 fig = px.scatter(
     df_annual,
     x="연도",
     y="연평균기온",
-    title="서울 연도별 평균기온 산점도 및 회귀 직선",
+    title="서울 연도별 평균기온 산점도 및 전체 회귀 직선",
     labels={"연도": "연도", "연평균기온": "연평균기온 (°C)"},
     opacity=0.7,
 )
 
-# 회귀 직선 추가
+# 전체 회귀 직선 추가
 fig.add_trace(
     go.Scatter(
         x=df_annual["연도"],
         y=df_annual["예측기온"],
         mode="lines",
-        name="회귀 직선",
+        name="전체 회귀 직선",
         line=dict(color="red", width=2),
     )
 )
@@ -109,13 +148,12 @@ st.plotly_chart(fig, use_container_width=True)
 
 # 상관계수 안내
 st.info(
-    f"📊 **연도와 연평균기온 간의 상관계수 ($r$):** `{correlation:.4f}`"
-    " (1에 가까울수록 강한 양의 상관관계가 있음을 의미합니다.)"
+    f"📊 **전체 기간 연도와 연평균기온 간의 상관계수 ($r$):** `{correlation:.4f}`"
 )
 
 st.markdown("---")
 
-# 연도 슬라이더로 예측 기온 확인
+# 연도 슬라이더로 예측 기온 확인 (전체 기간 학습 모델 기준)
 st.subheader("🔮 특정 연도 예상 기온 확인")
 selected_year = st.slider(
     "예측할 연도를 선택하세요",
@@ -125,8 +163,8 @@ selected_year = st.slider(
     step=1,
 )
 
-# 선택된 연도의 예상 기온 계산
-predicted_temp = model.predict([[selected_year]])[0]
+# 선택된 연도의 예상 기온 계산 (전체 기간 모델 기준)
+predicted_temp = model_all.predict([[selected_year]])[0]
 
 # 크게 표시
 st.markdown(
